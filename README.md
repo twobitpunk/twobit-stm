@@ -10,9 +10,7 @@ I tried several commercial screen time management tools like Microsoft Family an
 
   The twobit-stm client is a Windows service that runs irrespective of which user is logged in. The server side of things may be run on pretty much anything (including the machine running the client). The GUI tool (monitor) is only intended to help the end user keep track of how much time is left. Nothing is persisted, so if the server is restarted, the registered users get a fresh lease.
   
-  Neither the client nor the server are written to be bulletproof by any means. They are intended to help my kids - and maybe yours - spend less time in front of their computers.
-  
-  Everything is written in Python and super simple to customize to your needs. I will be adding an installation guide here - it is not terribly complicated, but getting a Python Windows service running requires a little work.
+  Everything is written in Python and super simple to customize to your needs. Have a look at the installation guide below - it is not terribly complicated, but getting a Python Windows service running requires a little work.
   
 ## Simple installation guide
   
@@ -28,11 +26,11 @@ I tried several commercial screen time management tools like Microsoft Family an
   * try running the service using `systemctl start stm.service`
   * If that works, you can enable autostart of the service by running `systemctl enable stm.service`
   
-  If all that works, all you have to do is figure out what the local username of the accounts you wish to limit are. Do this by running `set` from the command prompt in Windows. The `USERNAME` variable has the bit you want. Modify `stm-server.config` to match the names and times you want. At some point, I will probably figure out how to use Microsoft account names instead.
+  If all that works, all you have to do is figure out what the local usernames of the accounts you wish to limit are. Do this by running `set` from the command prompt in Windows. The `USERNAME` variable has the bit you want. Modify `stm-server.config` to match the names and times you want. At some point, I will probably figure out how to use Microsoft account names instead.
   
 ### Client
   Installing the client is also fairly simple:
-  * Install Python > 3.6
+  * Install Python >=3.6
   * Use `pip` (from in the scripts subfolder of you Python installation) to install `pywin32` and `websockets`
   * Still in the scripts folder, run `python pywin32_postinstall.py -install` to put files in the right places.
   * Put the `twobit-stm` project files in a folder - or just use the checkout folder
@@ -47,7 +45,10 @@ I tried several commercial screen time management tools like Microsoft Family an
 ### Monitor GUI
   The monitor GUI app shares configuration with the client service. It may be run directly as `python stm_client_monitor.py` from the command line or a shortcut.
   
+### Notes
   My client machines are running Windows 10 and the server is a RasPi that is doing lots of other things too. The server can also be run on Windows if you want.
+  
+  Neither the client nor the server are written to be bulletproof by any means. They are intended to help my kids - and maybe yours - spend less time in front of their computers. There are quite a few ways of fooling the client into thinking sessions are locked, the server isn't running and so on. Some I may fix - but so far, this is intended for home use in a not too hostile setting.
   
   That should be it! I have probably forgotten something - I will improve this along the way. Comments and suggestions are very welcome :-)
   
