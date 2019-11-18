@@ -6,7 +6,9 @@ This project is a simple set of three tools to manage screen time for kids.
  * A client that pings the server every 30 seconds (configurable) while the user is actively using the computer. Once the allotted time runs out, the client shuts down the computer.
  * A small GUI tool that shows the user how much time is left of the allotted time.
   
-  The client is a Windows service that runs irrespective of which user is logged in. The server side of things may be run on a Windows machine too (including the machine running the client). The GUI tool (monitor) is only intended to help the end user keep track of how much time is left. Nothing is persisted, so if the server is restarted, the registered users get a fresh lease.
+I tried several commercial screen time management tools like Microsoft Family and Kaspersky Safe Kids but they really didn't work too well and they are also a bit creepy to be honest.
+
+  The twobit-stm client is a Windows service that runs irrespective of which user is logged in. The server side of things may be run on pretty much anything (including the machine running the client). The GUI tool (monitor) is only intended to help the end user keep track of how much time is left. Nothing is persisted, so if the server is restarted, the registered users get a fresh lease.
   
   Neither the client nor the server are written to be bulletproof by any means. They are intended to help my kids - and maybe yours - spend less time in front of their computers.
   
@@ -24,6 +26,26 @@ This project is a simple set of three tools to manage screen time for kids.
   * try to run the service using plain Python like: python3 stm-server.py - check the output for errors (also the log file)
   * try running the service using systemctl start stm.service
   
-  If all that works, all you have to do is figure out what the local username of the accounts you wish to limit are. Do this by running 'set' from the command prompt in Windows. The USERNAME variable has the bit you want. Modify stm-server.config to match the names and times you want.
+  If all that works, all you have to do is figure out what the local username of the accounts you wish to limit are. Do this by running 'set' from the command prompt in Windows. The USERNAME variable has the bit you want. Modify stm-server.config to match the names and times you want. At some point, I will probably figure out how to use Microsoft account names instead.
+  
+  Installing the client is also fairly simple:
+  * Install Python > 3.6
+  * Use pip (from in the scripts subfolder of you Python installation) to install pywin32 and websockets
+  * Still in the scripts folder, run pywin32_postinstall.py to put files in the right places.
+  * Put the stm project files in a folder - or just use the checkout folder
+  * Open a command prompt with administrator rights and go to the stm folder
+  * Run python stm-server.py install and watch the output. There should be no errors
+  * Make the c:\etc directory if you haven't got one and put the stm-client.config in it.
+  * Check that the client configuration is pointing at the server installation.
+  * Press Win+R and run services.msc - find the Screen Time Manager Service and start it.
+  
+  Check the output of client and server to see if they are communicating properly.
+  
+  The monitor GUI app shares configuration with the client service. It may be run directly as 'python stm_client_monitor.py' from the command line or a shortcut.
+  
+  My client machines are running Windows 10 and the server is a RasPi that is doing lots of other things too. The server can also be run on Windows if you want.
+  
+  That should be it! I have probably forgotten something - I will improve this along the way. Comments and suggestions are very welcome :-)
+  
   
   
