@@ -12,3 +12,18 @@ This project is a simple set of three tools to manage screen time for kids.
   
   Everything is written in Python and super simple to customize to your needs. I will be adding an installation guide here - it is not terribly complicated, but getting a Python Windows service running requires a little work.
   
+  ==Simple installation guide==
+  
+  Installing the server is pretty simple (on Ubuntu):
+  * Put the project files in /opt/stm or something similar
+  * copy the stm.service script to /etc/system.d/system and check paths and such are correct
+  * run systemctl daemon-reload
+  * copy the stm-server.config to /etc
+  * install Python 3.6 or higher if it isn't already
+  * use pip to install websockets
+  * try to run the service using plain Python like: python3 stm-server.py - check the output for errors (also the log file)
+  * try running the service using systemctl start stm.service
+  
+  If all that works, all you have to do is figure out what the local username of the accounts you wish to limit are. Do this by running 'set' from the command prompt in Windows. The USERNAME variable has the bit you want. Modify stm-server.config to match the names and times you want.
+  
+  
