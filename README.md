@@ -2,8 +2,8 @@
 # Simple Screen Time Manager
 
 This project is a simple set of three tools to manage screen time for kids.
- * A server that tracks time spent by users that have a corresponding server side configuration
- * A client that pings the server every 30 seconds (configurable) while the user is actively using the computer. Once the allotted time runs out, the client shuts down the computer.
+ * A server that tracks time spent by users that have a corresponding (very simple) server side configuration.
+ * A client that pings the server at intervals while the user is actively using the computer. Once the allotted time runs out, the client shuts down the computer.
  * A small GUI tool that shows the user how much time is left of the allotted time.
   
 I tried several commercial screen time management tools like Microsoft Family and Kaspersky Safe Kids but they really didn't work too well and they are also a bit creepy to be honest.
