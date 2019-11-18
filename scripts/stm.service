@@ -1,0 +1,12 @@
+[Unit]
+Description=Screen Time Manager Service
+After=multi-user.target
+ 
+[Service]
+Type=simple
+
+ExecStart=python3 /opt/ScreenTimeManager/server/stm-server.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
