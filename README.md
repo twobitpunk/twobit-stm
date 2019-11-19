@@ -17,9 +17,9 @@ I tried several commercial screen time management tools like Microsoft Family an
 ### Server
   Installing the server is pretty simple (on Ubuntu):
   * Put the project files in `/opt/stm` or something similar
-  * copy the `stm.service` script to `/etc/system.d/system` and check paths and such are correct
+  * copy or link the `stm.service` script to `/etc/systemd/system` and check paths and such are correct
   * run `systemctl daemon-reload`
-  * copy the `stm-server.config` to `/etc`
+  * copy the `stm-server.config` to `/etc` - edit to suit your fancy
   * install Python 3.6 or higher if it isn't already
   * use `pip` to install `websockets`
   * try to run the service using plain Python like: `python3 stm-server.py` - check the output for errors (also the log file)
