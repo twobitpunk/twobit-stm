@@ -1,0 +1,2 @@
+# Adding something
+Screen Time Manager is free to use and free to modify. Do a fork or branch if you want - or if you want to contribute to this repo, please message me. Generally speaking I would like this project to remain a no-spying alternative to the commercially available options, so my general idea is to not add logging of applications in use and that sort of thing. Also, unless entirely impractical, state should generally not be saved and cloud storage will not become part of the project.
