@@ -26,7 +26,7 @@ I tried several commercial screen time management tools like Microsoft Family an
   * try running the service using `systemctl start stm.service`
   * If that works, you can enable autostart of the service by running `systemctl enable stm.service`
   
-  If all that works, all you have to do is figure out what the local usernames of the accounts you wish to limit are. Do this by running `set` from the command prompt in Windows. The `USERNAME` variable has the bit you want. Modify `stm-server.config` to match the names and times you want. You can also use MS account names if you like. This is the better choice if your kids use more than one computer.
+  If all that works, all you have to do is figure out what the local usernames of the accounts you wish to limit are. Do this by running `set` from the command prompt in Windows. The `USERNAME` variable has the bit you want. Modify `stm-server.config` to match the names and times you want. You can also use Microsoft account names (e-mail addresses) if you like. This is the better choice if your kids use more than one computer.
   
 ### Client
   Installing the client is also fairly simple:
