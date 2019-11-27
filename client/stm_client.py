@@ -33,7 +33,7 @@ class ScreenTimeManagerClient(BaseService):
     _warn_time_seconds = 600
     _computer = None
     _utility = None
-
+    _use_ms_account = False
 
     def __init__(self, args):
         super().__init__(args)
@@ -49,6 +49,7 @@ class ScreenTimeManagerClient(BaseService):
         self._sleep_time_seconds = self._parser.getint('general', 'sleep-time-seconds')
         self._warn_time_seconds = self._parser.getint('general', 'warn-time-seconds')
         self._icon_path = self._parser.get('general', 'icon-path')
+        self._use_ms_account = self._parser.getboolean('general', 'use-ms-account')
 
         # Configure logging
         self.configure_logging()
@@ -116,14 +117,19 @@ class ScreenTimeManagerClient(BaseService):
             self._logger.error('Error while querying Screen Time Manager Server - perhaps not running? Error: %s', e)
             return True  # We really don't know here, err on the side of caution.
 
-    """This method probably does not work correctly if several users are logged on at the same time."""
-
     def check_users(self):
-        _user = self._utility.get_current_user()
-        _is_locked = self._utility.is_session_locked()
-        if _user is not None and not _is_locked:
-            # Check with the service at this point and log off if it returns False
+        _user_name=None
+        if self._use_ms_account:
+            _user = self._utility.get_ms_account_name()
+            _user_name = _user
+        else:
+            _user = self._utility.get_current_user()
             _user_name = str(_user[2]).strip().lower()
+
+        _is_locked = self._utility.is_session_locked()
+        if _user_name is not None and not _is_locked:
+            # Check with the service at this point and log off if it returns False
+            self._logger.debug('Checking time left for user: %s', _user)
             _is_allowed = asyncio.get_event_loop().run_until_complete(self.check_time_left(_user_name))
             if not _is_allowed and not self._is_logoff_issued:
                 self._logger.debug('Logging off user %s', _user_name)

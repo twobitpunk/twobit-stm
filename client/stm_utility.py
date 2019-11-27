@@ -1,5 +1,6 @@
 import wmi
 import subprocess
+import winreg
 
 
 class STMUtilities:
@@ -13,6 +14,16 @@ class STMUtilities:
         for process in self._computer.Win32_Process(name='explorer.exe'):
             _current_user = process.GetOwner()
         return _current_user
+
+    @staticmethod
+    def get_ms_account_name():
+        ms_account_name = None
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\IdentityCRL\UserExtendedProperties", 0,
+                                 winreg.KEY_READ | winreg.KEY_WOW64_32KEY)
+            ms_account_name = winreg.EnumKey(key, 0)
+        finally:
+            return ms_account_name
 
     @staticmethod
     def is_session_locked():
