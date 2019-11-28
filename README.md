@@ -1,4 +1,3 @@
-# twobit-stm
 # Simple Screen Time Manager
 
 This project is a simple set of three tools to manage screen time for kids.
