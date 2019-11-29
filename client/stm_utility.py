@@ -1,6 +1,7 @@
 import wmi
 import subprocess
 import winreg
+import win32security
 
 
 class STMUtilities:
@@ -15,12 +16,13 @@ class STMUtilities:
             _current_user = process.GetOwner()
         return _current_user
 
-    @staticmethod
-    def get_ms_account_name():
+    def get_ms_account_name(self):
         ms_account_name = None
         try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\IdentityCRL\UserExtendedProperties", 0,
-                                 winreg.KEY_READ | winreg.KEY_WOW64_32KEY)
+            sid, domain, _type = win32security.LookupAccountName('localhost', self.get_current_user()[2])
+            sid_str = win32security.ConvertSidToStringSid(sid)
+            sub_key = r'\Software\Microsoft\IdentityCRL\UserExtendedProperties'
+            key = winreg.OpenKey(winreg.HKEY_USERS, sid_str + sub_key)
             ms_account_name = winreg.EnumKey(key, 0)
         finally:
             return ms_account_name

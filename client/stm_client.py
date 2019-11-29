@@ -2,16 +2,19 @@ import asyncio
 import websockets
 import wmi
 from subprocess import check_output
-from win10toast import ToastNotifier
-from time import sleep
 import platform
 import configparser
 import logging
+import win32api
+import win32con
+import win32gui
+import win32ts
+from threading import Thread, Event
 
 # noinspection PyBroadException
 try:
-    from . stm_utility import STMUtilities
-    from . base_service import BaseService
+    from .stm_utility import STMUtilities
+    from .base_service import BaseService
 except:
     from stm_utility import STMUtilities
     from base_service import BaseService
@@ -27,13 +30,19 @@ class ScreenTimeManagerClient(BaseService):
     _log_level = 10
     _icon_path = None
     _logger = None
-    _is_running = False
-    _is_logoff_issued = False
+    _stop_event = Event()
+    _is_shutdown_issued = False
     _time_left = 0.0
     _warn_time_seconds = 600
     _computer = None
     _utility = None
     _use_ms_account = False
+    _event_listener = None
+    _is_session_locked = False
+
+    WM_WTSSESSION_CHANGE = 0x2B1
+    WTS_SESSION_LOCK = 0x7
+    WTS_SESSION_UNLOCK = 0x8
 
     def __init__(self, args):
         super().__init__(args)
@@ -58,16 +67,68 @@ class ScreenTimeManagerClient(BaseService):
         self._utility = STMUtilities()
         self._logger.info('Starting Screen Time Manager Client Service.')
 
+    # noinspection PyUnusedLocal
+    def msg_handler(self, hwnd, msg, wparam, lparam):
+        if msg == self.WM_WTSSESSION_CHANGE:
+            self._logger.debug('Caught a session change message: %s, event: %s', msg, wparam)
+            if wparam == self.WTS_SESSION_LOCK:
+                self._logger.debug('Session is locked')
+                self._is_session_locked = True
+            elif wparam == self.WTS_SESSION_UNLOCK:
+                self._logger.debug('Session is unlocked')
+                self._is_session_locked = False
+            else:
+                self._logger.debug('Strange session change event: %s', wparam)
+
+    def message_receiver(self):  # Hidden window that can listen for messages
+        self._logger.debug('Starting the message receiver')
+        event_window = None
+        try:
+            hinst = win32api.GetModuleHandle(None)
+            wndclass = win32gui.WNDCLASS()
+            wndclass.hInstance = hinst
+            wndclass.lpszClassName = "ListenerWindowClass"
+            wndclass.lpfnWndProc = self.msg_handler
+            event_window = None
+
+            event_window_class = win32gui.RegisterClass(wndclass)
+            event_window = win32gui.CreateWindowEx(0, event_window_class,
+                                                   "ListenerWindow",
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   win32con.HWND_MESSAGE,
+                                                   None,
+                                                   None,
+                                                   None)
+            win32ts.WTSRegisterSessionNotification(event_window, win32ts.NOTIFY_FOR_ALL_SESSIONS)
+            while not self._stop_event.is_set():
+                win32gui.PumpWaitingMessages()
+                self._stop_event.wait(5)
+        except Exception as e:
+            self._logger.error("Exception while making message handler: %s", e)
+        finally:
+            win32ts.WTSUnRegisterSessionNotification(event_window)
+            self._logger.debug('Exiting the message receiver')
+
     def start(self):
-        self._is_running = True
+        self._logger.debug('Entering start')
 
     def stop(self):
-        self._is_running = False
+        self._logger.debug('Entering stop')
+        self._stop_event.set()
+        self._event_listener.join()
 
     def main(self):
-        while self._is_running:
+        self._logger.debug('Entering main')
+        self._event_listener = Thread(target=self.message_receiver)
+        self._event_listener.start()
+
+        while not self._stop_event.is_set():
             self.check_users()
-            sleep(self._sleep_time_seconds)
+            self._stop_event.wait(self._sleep_time_seconds)
 
     def configure_logging(self):
         self._logger = logging.getLogger('stm')
@@ -81,33 +142,26 @@ class ScreenTimeManagerClient(BaseService):
         self._logger.addHandler(fh)
         self._logger.addHandler(ch)
 
-    def logoff_windows(self):
-        self._logger.info('Logging off Windows session')
-
+    def shutdown(self):
+        self._logger.info('Shutting down Windows')
         output = None
         try:
             self._logger.info('Issuing shutdown warning at %s minutes', self._warn_time_seconds / 60.0)
             output = check_output('shutdown /s /t {}'.format(str(self._warn_time_seconds)))
         except Exception as e:
             self._logger.error('Error while doing timed shutdown: %s, output from command was: %s', e, output)
-        logging.debug('Output from logoff command was: %s', output)
+        self._logger.debug('Output from logoff command was: %s', output)
 
-    """Not really working as is. But the win10toast stuff works in simple test cases. Hmmmm."""
-    def show_message(self):
-        if 0.0 <= self._time_left <= 0.5 and int(self._time_left * 60.0) % 5 == 0:  # Every 5 minutes if < 30 mins left
-            toaster = ToastNotifier()
-            toaster.show_toast("Screen Time Manager",
-                               "This machine will shut down in {} minutes".format(str(self._time_left)),
-                               icon_path=self._icon_path,
-                               duration=10)
+    def cancel_shutdown(self):
+        output = check_output('shutdown /a')
+        self._logger.info('Cancelling shutdown - new lease acquired: %s', str(output))
 
     async def check_time_left(self, user_name):
         try:
-            async with websockets.connect(self._server_uri) as ws:
+            async with websockets.connect(self._server_uri, timeout=5) as ws:
                 await ws.send(str(user_name))
                 response = await ws.recv()
                 self._time_left = float(response) - self._warn_time_seconds / 3600.0
-                #  self.show_message()  # Not working right just now
                 if self._time_left < 0.0:
                     self._logger.debug('No time left for user %s', user_name)
                     return False
@@ -118,7 +172,7 @@ class ScreenTimeManagerClient(BaseService):
             return True  # We really don't know here, err on the side of caution.
 
     def check_users(self):
-        _user_name=None
+        _user_name = None
         if self._use_ms_account:
             _user = self._utility.get_ms_account_name()
             _user_name = _user
@@ -126,17 +180,23 @@ class ScreenTimeManagerClient(BaseService):
             _user = self._utility.get_current_user()
             _user_name = str(_user[2]).strip().lower()
 
-        _is_locked = self._utility.is_session_locked()
-        if _user_name is not None and not _is_locked:
-            # Check with the service at this point and log off if it returns False
-            self._logger.debug('Checking time left for user: %s', _user)
-            _is_allowed = asyncio.get_event_loop().run_until_complete(self.check_time_left(_user_name))
-            if not _is_allowed and not self._is_logoff_issued:
-                self._logger.debug('Logging off user %s', _user_name)
-                self.logoff_windows()
-                self._is_logoff_issued = True  # Flagging that the logoff is initiated.
-            elif _is_allowed:
-                self._is_logoff_issued = False  # Reset the logoff flag if there is still time left - new day maybe.
+        self._logger.debug('Current active user is: %s', _user_name)
+
+        if _user_name is not None:
+            if not self._is_session_locked:
+                # Check with the service at this point and log off if it returns False
+                self._logger.debug('Checking time left for user: %s', _user)
+                _is_allowed = asyncio.get_event_loop().run_until_complete(self.check_time_left(_user_name))
+                if not _is_allowed and not self._is_shutdown_issued:
+                    self.shutdown()
+                    self._is_shutdown_issued = True  # Flagging that the logoff is initiated.
+                elif _is_allowed and self._is_shutdown_issued:
+                    self._is_shutdown_issued = False  # Reset the logoff flag if there is still time left - new day maybe.
+                    self.cancel_shutdown()
+            else:
+                self._logger.debug('Session for user %s is locked', _user_name)
+        else:
+            self._logger.debug('User is None - perhaps noone is logged on?')
 
 
 if __name__ == '__main__':
