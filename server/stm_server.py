@@ -97,7 +97,7 @@ class ScreenTimeManagerServer:
             if _user not in _sections:  # This user was removed, so delete the ScreenTime object
                 del self._screen_times[_user]
 
-    def get_screen_time_for_user(self, user=None):
+    def get_screen_time_limit_for_user(self, user=None):
         self._logger.debug('Getting screen time for user %s', user)
         if user is None:
             return 24.0
@@ -108,7 +108,7 @@ class ScreenTimeManagerServer:
         else:
             return float(self._screen_times[user][this_day])
 
-    def update_screen_time_for_user(self, user):
+    def get_screen_time_spent_for_user(self, user, update=False):
         _today = datetime.now().strftime("%A").lower()
         _time_tracker = self._time_trackers.get(user)
         _time_spent = 0.0
@@ -119,22 +119,42 @@ class ScreenTimeManagerServer:
             self._logger.debug('New day for user %s - resetting time tracker', user)
             self._time_trackers[user] = TimeTracker(pause_threshold=self._pause_threshold)
         else:
-            _time_spent = self._time_trackers[user].update()
+            if update:
+                _time_spent = self._time_trackers[user].update()
+            else:
+                _time_spent = self._time_trackers[user].get_time_spent()
             self._logger.debug('User %s has spent %s hours of screen time', user, _time_spent)
         return _time_spent
 
     # noinspection PyUnusedLocal
     async def ws_serve(self, websocket, path):
         try:
-            _request = await websocket.recv()
-            _user_name = str(_request).strip().lower()
-            self._check_config()  # Reload config if changed
-            screen_time_limit = self.get_screen_time_for_user(_user_name)
-            screen_time_spent = self.update_screen_time_for_user(_user_name)
-            screen_time_remaining = screen_time_limit - screen_time_spent
-            self._logger.debug('User %s has spent %s out of %s hours allowed. Sending %s remaining hours.', _user_name,
-                               screen_time_spent, screen_time_limit, screen_time_remaining)
-            await websocket.send(str(screen_time_remaining))  # Send time remaining
+            request = await websocket.recv()
+            query = eval(request)  # Rebuild the dictionary sent by the client
+            user_name = query.get('user_name')
+            command = query.get('command')
+            screen_time_remaining = 24.0  # Maybe configurable so you can send 0.0 or some other default?
+            self._logger.debug('Received command %s for user %s', command, user_name)
+
+            if user_name is None or command is None or len(user_name) == 0 or len(command) == 0:
+                self._logger.warning('Invalid user_name or command received: %s, %s', user_name, command)
+                await websocket.send(str(screen_time_remaining))  # Send time remaining
+            else:
+                self._check_config()  # Reload config if changed
+
+                screen_time_spent = 0.0
+                if command == 'query_time_left':
+                    screen_time_spent = self.get_screen_time_spent_for_user(user_name)
+                elif command == 'update_time_left':
+                    screen_time_spent = self.get_screen_time_spent_for_user(user_name, update=True)
+                else:
+                    self._logger.warning('Received invalid command %s from client %s', command, websocket.remote_address()[0])
+
+                screen_time_limit = self.get_screen_time_limit_for_user(user_name)
+                screen_time_remaining = screen_time_limit - screen_time_spent
+                self._logger.debug('User %s has spent %s out of %s hours allowed. Sending %s remaining hours.',
+                                   user_name, screen_time_spent, screen_time_limit, screen_time_remaining)
+                await websocket.send(str(screen_time_remaining))  # Send time remaining
         except Exception as e:
             self._logger.warning('Unable to send session info to client. %s', e)
 

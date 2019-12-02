@@ -11,7 +11,7 @@ import win32gui
 import win32ts
 from threading import Thread, Event
 
-# noinspection PyBroadException
+# noinspection PyBroadException, PyUnresolvedReferences
 try:
     from .stm_utility import STMUtilities
     from .base_service import BaseService
@@ -157,9 +157,10 @@ class ScreenTimeManagerClient(BaseService):
         self._logger.info('Cancelling shutdown - new lease acquired: %s', str(output))
 
     async def check_time_left(self, user_name):
+        request = {'user_name': user_name, 'command': 'update_time_left'}
         try:
             async with websockets.connect(self._server_uri, timeout=5) as ws:
-                await ws.send(str(user_name))
+                await ws.send(str(request))
                 response = await ws.recv()
                 self._time_left = float(response) - self._warn_time_seconds / 3600.0
                 if self._time_left < 0.0:
@@ -191,7 +192,7 @@ class ScreenTimeManagerClient(BaseService):
                     self.shutdown()
                     self._is_shutdown_issued = True  # Flagging that the logoff is initiated.
                 elif _is_allowed and self._is_shutdown_issued:
-                    self._is_shutdown_issued = False  # Reset the logoff flag if there is still time left - new day maybe.
+                    self._is_shutdown_issued = False  # Reset logoff flag if there is still time left. New day maybe.
                     self.cancel_shutdown()
             else:
                 self._logger.debug('Session for user %s is locked', _user_name)

@@ -47,12 +47,11 @@ class ScreenTimeClientMonitor:
             self._user = str(self._user[2]).strip().lower()
 
     async def get_time_remaining(self):
-        is_locked = self._utility.is_session_locked()  # Only query when session is unlocked
-
-        if self._user is not None and not is_locked:
+        if self._user is not None:
+            command = {'user_name': self._user, 'command': 'query_time_left'}
             try:
                 async with websockets.connect(self._server_uri) as ws:
-                    await ws.send(self._user)
+                    await ws.send(str(command))
                     response = await ws.recv()
                     self._time_left = float(response)
             except:
