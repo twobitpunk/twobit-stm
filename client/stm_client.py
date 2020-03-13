@@ -1,3 +1,4 @@
+import sys
 import asyncio
 import websockets
 import wmi
@@ -11,12 +12,14 @@ import win32gui
 import win32ts
 from threading import Thread, Event
 
-# noinspection PyBroadException, PyUnresolvedReferences
+# noinspection PyBroadException
 try:
     from .stm_utility import STMUtilities
     from .base_service import BaseService
 except:
+    # noinspection PyUnresolvedReferences
     from stm_utility import STMUtilities
+    # noinspection PyUnresolvedReferences
     from base_service import BaseService
 
 
@@ -48,7 +51,7 @@ class ScreenTimeManagerClient(BaseService):
         super().__init__(args)
         # Load configuration
         self._parser = configparser.ConfigParser()
-        if platform.system() is 'Windows':
+        if platform.system() == 'Windows':
             self._parser.read('c:\\etc\\stm-client.config')
         else:
             self._parser.read('/etc/stm-client.config')
@@ -66,6 +69,10 @@ class ScreenTimeManagerClient(BaseService):
         self._computer = wmi.WMI('localhost')
         self._utility = STMUtilities()
         self._logger.info('Starting Screen Time Manager Client Service.')
+        if sys.platform == "win32" and sys.version_info >= (3, 8, 0):
+            #  There seems to be a problem in Python 3.8.x preventing event loops from working as before on Windows
+            # noinspection PyUnresolvedReferences
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     # noinspection PyUnusedLocal
     def msg_handler(self, hwnd, msg, wparam, lparam):
@@ -153,8 +160,11 @@ class ScreenTimeManagerClient(BaseService):
         self._logger.debug('Output from logoff command was: %s', output)
 
     def cancel_shutdown(self):
-        output = check_output('shutdown /a')
-        self._logger.info('Cancelling shutdown - new lease acquired: %s', str(output))
+        try:
+            output = check_output('shutdown /a')
+            self._logger.info('Cancelling shutdown - new lease acquired: %s', str(output))
+        except Exception as e:
+            self._logger.error('Error while cancelling issued shutdown: %s', e)
 
     async def check_time_left(self, user_name):
         request = {'user_name': user_name, 'command': 'update_time_left'}
@@ -187,12 +197,16 @@ class ScreenTimeManagerClient(BaseService):
             if not self._is_session_locked:
                 # Check with the service at this point and log off if it returns False
                 self._logger.debug('Checking time left for user: %s', _user)
-                _is_allowed = asyncio.get_event_loop().run_until_complete(self.check_time_left(_user_name))
+                _is_allowed = False
+                try:
+                    _is_allowed = asyncio.get_event_loop().run_until_complete(self.check_time_left(_user_name))
+                except Exception as e:
+                    self._logger.error('Oopsie while querying service: %s', e)
                 if not _is_allowed and not self._is_shutdown_issued:
                     self.shutdown()
                     self._is_shutdown_issued = True  # Flagging that the logoff is initiated.
                 elif _is_allowed and self._is_shutdown_issued:
-                    self._is_shutdown_issued = False  # Reset logoff flag if there is still time left. New day maybe.
+                    self._is_shutdown_issued = False  # Reset logoff flag. New day or new user maybe.
                     self.cancel_shutdown()
             else:
                 self._logger.debug('Session for user %s is locked', _user_name)
